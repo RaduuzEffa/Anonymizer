@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Anonymizer PWA</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#e63946">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: { colors: { primary: '#1e40af', secondary: '#3b82f6' } }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Knihovny -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx-populate/1.21.0/xlsx-populate.min.js"></script>
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.5.1/mammoth.browser.min.js"></script>
+    <script src="https://unpkg.com/html-docx-js/dist/html-docx.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.37.11/docxtemplater.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://unpkg.com/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+    
+    <script src="app.js" defer></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-inter antialiased min-h-screen flex flex-col">
+    
+    <header class="bg-primary text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-user-secret text-2xl"></i>
+                <h1 class="text-xl font-bold tracking-wide">Anonymizer</h1>
+            </div>
+            <button id="btn-db" class="hover:text-blue-200 transition">
+                <i class="fa-solid fa-database"></i> <span class="hidden sm:inline ml-1">Mapy klíčů</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto w-full px-4 py-6 md:py-10 space-y-6 flex-grow">
+        
+        <!-- 1. Dropzone -->
+        <div id="upload-section" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 text-center">Nahrát dokumenty</h2>
+            <label class="upload-area w-full max-w-2xl border-2 border-dashed border-gray-300 rounded-xl p-10 flex flex-col items-center justify-center cursor-pointer hover:bg-blue-50 transition text-center group">
+                <i class="fa-solid fa-file-arrow-up text-5xl text-gray-400 group-hover:text-secondary transition mb-4"></i>
+                <span class="font-medium text-gray-700 text-lg">Vyberte nebo přetáhněte JEDEN či VÍCE souborů</span>
+                <span class="text-sm text-gray-500 mt-2">Podporované formáty: Excel, Word, PDF, Text</span>
+                <!-- Přidáno multiple pro výběr více souborů najednou -->
+                <input type="file" id="file-upload" class="hidden" accept=".xlsx, .xls, .csv, .txt, .docx, .doc, .pdf" multiple>
+            </label>
+        </div>
+
+        <!-- 2. Výběr akce -->
+        <div id="action-selection" class="hidden bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">Připraveno:</h3>
+                    <p class="text-secondary font-medium" id="current-filename-action">soubor.xlsx</p>
+                </div>
+                <button id="btn-cancel-action" class="text-sm text-red-500 hover:text-red-700 font-medium bg-red-50 px-3 py-1.5 rounded-lg">
+                    <i class="fa-solid fa-xmark"></i> Zrušit
+                </button>
+            </div>
+            
+            <!-- Pro 1 soubor -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="action-single-file">
+                <button id="btn-choose-anon" class="p-6 border-2 border-gray-200 rounded-xl hover:border-secondary hover:bg-blue-50 transition text-left group">
+                    <i class="fa-solid fa-user-secret text-3xl text-gray-400 group-hover:text-secondary mb-3"></i>
+                    <h4 class="font-bold text-lg text-gray-800 mb-1">Anonymizovat data</h4>
+                    <p class="text-sm text-gray-500">Skrýt sloupce nebo najít citlivé údaje a nahradit je ochrannými značkami.</p>
+                </button>
+                <button id="btn-choose-deanon" class="p-6 border-2 border-gray-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition text-left group">
+                    <i class="fa-solid fa-rotate-left text-3xl text-gray-400 group-hover:text-emerald-500 mb-3"></i>
+                    <h4 class="font-bold text-lg text-gray-800 mb-1">De-anonymizovat</h4>
+                    <p class="text-sm text-gray-500">Máte upravený soubor se značkami? Vrátíme do něj zpět původní data.</p>
+                </button>
+            </div>
+
+            <!-- Pro VÍCE souborů -->
+            <div id="action-multi-file" class="hidden space-y-6">
+                <div class="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                    <h4 class="font-bold text-gray-800 mb-3"><i class="fa-solid fa-list-ol text-gray-500 mr-2"></i> Pořadí slučovaných souborů</h4>
+                    <p class="text-sm text-gray-600 mb-4">Seřaďte soubory tak, jak chcete, aby se jejich data poskládala pod sebe (první soubor nahoře bude obsahovat i záhlaví).</p>
+                    <ul id="merge-file-list" class="space-y-2">
+                        <!-- Zde se vykreslí seznam souborů -->
+                    </ul>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button id="btn-choose-merge-deanon" class="p-6 border-2 border-purple-200 bg-purple-50 rounded-xl hover:border-purple-500 hover:bg-purple-100 transition text-left group">
+                        <i class="fa-solid fa-layer-group text-3xl text-purple-400 group-hover:text-purple-600 mb-2"></i>
+                        <h4 class="font-bold text-lg text-purple-900 mb-1">Sloučit a De-anonymizovat</h4>
+                        <p class="text-sm text-purple-700">Spojí soubory a ihned vrátí původní skrytá data (ideální pro finální tabulku).</p>
+                    </button>
+                    
+                    <button id="btn-choose-merge-only" class="p-6 border-2 border-blue-200 bg-blue-50 rounded-xl hover:border-blue-500 hover:bg-blue-100 transition text-left group">
+                        <i class="fa-solid fa-link text-3xl text-blue-400 group-hover:text-blue-600 mb-2"></i>
+                        <h4 class="font-bold text-lg text-blue-900 mb-1">Pouze Sloučit</h4>
+                        <p class="text-sm text-blue-700">Spojí soubory a odstraní mezery, ale PONECHÁ všechny ochranné značky beze změny.</p>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3A. Anonymizace UI -->
+        <div id="search-section" class="hidden bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-4">
+                <h3 class="font-bold text-lg text-gray-800"><i class="fa-solid fa-user-secret text-secondary mr-2"></i> Anonymizace</h3>
+                <button id="btn-back-from-anon" class="text-sm text-gray-500 hover:text-gray-800 font-medium bg-gray-100 px-3 py-1.5 rounded-lg">Zpět</button>
+            </div>
+
+            <!-- Anonymizace Sloupců (Pouze pro tabulky) -->
+            <div id="excel-columns-wrapper" class="bg-indigo-50 p-5 rounded-xl border border-indigo-100 hidden">
+                <div class="flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-table-columns text-indigo-500 text-lg"></i>
+                    <h4 class="font-bold text-indigo-900">Anonymizovat celé sloupce (podle záhlaví)</h4>
+                </div>
+                <div class="flex gap-2 mb-3">
+                    <button id="btn-cols-all" class="text-xs bg-white border border-indigo-200 px-3 py-1.5 rounded shadow-sm hover:bg-indigo-100 transition font-medium text-indigo-800">Vybrat vše</button>
+                    <button id="btn-cols-none" class="text-xs bg-white border border-indigo-200 px-3 py-1.5 rounded shadow-sm hover:bg-indigo-100 transition font-medium text-indigo-800">Zrušit výběr</button>
+                </div>
+                <div id="excel-columns-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-48 overflow-y-auto pr-2"></div>
+            </div>
+
+            <!-- Anonymizace vyhledáním -->
+            <div class="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                <div class="flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-magnifying-glass-chart text-gray-500 text-lg"></i>
+                    <h4 class="font-bold text-gray-800">Nebo vyhledat a nahradit konkrétní hodnoty napříč textem</h4>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg cursor-pointer hover:bg-blue-50 transition">
+                        <input type="checkbox" id="search-rc" class="entity-checkbox" checked>
+                        <span>Rodná čísla (formát 123456/7890)</span>
+                    </label>
+                    <label class="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg cursor-pointer hover:bg-blue-50 transition">
+                        <input type="checkbox" id="search-email" class="entity-checkbox" checked>
+                        <span>E-mailové adresy</span>
+                    </label>
+                </div>
+                <div class="mt-4 flex gap-2">
+                    <input type="text" id="search-custom" placeholder="Nadefinujte slova k hledání (např. Daniela, oheň, 25.2.)" class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary">
+                    <button id="btn-search" class="bg-gray-800 hover:bg-black text-white px-6 py-3 rounded-lg font-medium transition shadow-sm">Hledat</button>
+                </div>
+                <div id="active-search-terms" class="flex flex-wrap gap-2 mt-3"></div>
+            </div>
+
+            <!-- Výsledky hledání -->
+            <div id="results-area" class="hidden space-y-4 pt-2">
+                <div class="flex justify-between items-center bg-blue-50 text-blue-800 p-3 rounded-lg border border-blue-100">
+                    <span class="text-sm font-medium" id="detection-summary">Nalezeno 0 výsledků.</span>
+                    <button id="btn-toggle-all" class="text-xs bg-white border border-blue-200 px-3 py-1.5 rounded shadow-sm hover:bg-blue-100 transition text-blue-700 font-medium">Odznačit vše</button>
+                </div>
+                <div id="entities-container" class="max-h-64 overflow-y-auto pr-2 space-y-2"></div>
+            </div>
+
+            <!-- Export Anon -->
+            <div class="pt-6 border-t border-gray-200">
+                <button id="btn-anonymize-export" class="w-full bg-secondary hover:bg-primary text-white px-8 py-4 rounded-xl font-bold transition shadow-md flex items-center justify-center gap-2 opacity-50 cursor-not-allowed" disabled>
+                    <i class="fa-solid fa-user-shield text-xl"></i> Anonymizovat a Uložit
+                </button>
+            </div>
+        </div>
+
+        <!-- 3B. De-anonymizace UI -->
+        <div id="deanon-section" class="hidden bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-4">
+                <h3 class="font-bold text-lg text-gray-800"><i class="fa-solid fa-rotate-left text-emerald-500 mr-2"></i> De-anonymizace</h3>
+                <button id="btn-back-from-deanon" class="text-sm text-gray-500 hover:text-gray-800 font-medium bg-gray-100 px-3 py-1.5 rounded-lg">Zpět</button>
+            </div>
+
+            <div class="bg-emerald-50 p-5 rounded-xl border border-emerald-100">
+                <div class="flex items-center gap-2 mb-4">
+                    <i class="fa-solid fa-database text-emerald-600 text-lg"></i>
+                    <h4 class="font-bold text-emerald-900">Režim obnovení dat:</h4>
+                </div>
+                
+                <div class="space-y-3 mb-4">
+                    <label class="flex items-start gap-3 p-3 bg-white border border-emerald-200 rounded-lg cursor-pointer shadow-sm">
+                        <input type="radio" name="deanon-mode" value="auto" class="mt-1 text-emerald-600 focus:ring-emerald-500" checked>
+                        <div>
+                            <strong class="block text-emerald-900">Globální / Chytrý režim</strong>
+                            <span class="text-sm text-emerald-700">Aplikace prohledá historii všech vašich anonymizací. Pokud jste sloučili více Excelů do jednoho, tohle vše perfektně přeloží zpět bez nutnosti cokoliv vybírat.</span>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start gap-3 p-3 bg-white border border-emerald-200 rounded-lg cursor-pointer opacity-80 hover:opacity-100 transition">
+                        <input type="radio" name="deanon-mode" value="manual" class="mt-1 text-emerald-600 focus:ring-emerald-500">
+                        <div class="w-full">
+                            <strong class="block text-emerald-900">Vybrat konkrétní mapu</strong>
+                            <div class="flex gap-2 mt-2 hidden" id="manual-map-selector">
+                                <select id="db-maps-select" class="flex-grow p-2 border border-emerald-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                                    <option value="">Načítám dostupné mapy...</option>
+                                </select>
+                                <button id="btn-delete-map" class="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-lg font-medium transition" title="Smazat vybranou mapu z historie">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="flex justify-end pt-2 border-t border-emerald-200">
+                    <button id="btn-delete-all-maps" class="text-xs text-red-500 hover:underline"><i class="fa-solid fa-triangle-exclamation"></i> Smazat celou historii klíčů</button>
+                </div>
+            </div>
+
+            <div class="pt-2">
+                <button id="btn-execute-deanon" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-xl font-bold transition shadow-md flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-unlock text-xl"></i> Provést De-anonymizaci
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="loader" class="fixed inset-0 bg-white/90 backdrop-blur-sm z-[100] hidden flex-col items-center justify-center">
+        <div class="w-16 h-16 border-4 border-gray-200 border-t-emerald-500 rounded-full animate-spin mb-4" id="loader-spinner"></div>
+        <p class="text-lg font-medium text-gray-800" id="loader-text">Zpracovávám...</p>
+    </div>
+</body>
+</html>

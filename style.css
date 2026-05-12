@@ -1,0 +1,38 @@
+/* Custom fonts setup */
+.font-inter {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Custom Scrollbar for the entities list */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9; 
+    border-radius: 4px;
+}
+ 
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1; 
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8; 
+}
+
+/* Checkbox styling */
+.entity-checkbox {
+    accent-color: #3b82f6;
+    width: 1.25rem;
+    height: 1.25rem;
+    cursor: pointer;
+}
+
+/* Upload area animation */
+.upload-area.dragover {
+    background-color: #eff6ff; /* blue-50 */
+    border-color: #3b82f6; /* blue-500 */
+}
